@@ -44,6 +44,14 @@ def default_compute_score(
         from . import gsm8k
 
         res = gsm8k.compute_score(solution_str, ground_truth)
+    elif data_source == "openai/gsm8k/encoded":
+        from .custom_rewards import encoded_reward
+
+        res = encoded_reward(solution_str, ground_truth)
+    elif data_source == "openai/gsm8k/length_penalty":
+        from .custom_rewards import length_penalty_reward
+
+        res = length_penalty_reward(solution_str, ground_truth)
     elif data_source in ["lighteval/MATH", "DigitalLearningGmbH/MATH-lighteval", "HuggingFaceH4/MATH-500"]:
         from . import math
 
