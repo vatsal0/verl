@@ -87,7 +87,7 @@ def model_call_with_logprobs(model, context):
 def encoded_reward(solution_str, ground_truth):
     reward = 0
 
-    format_pattern = fr"^\s*<reasoning>\s*.*?\s*</reasoning>\s*<answer1>\s*.*?\s*</answer1>\s*<answer2>\s*.*?\s*</answer2>$"
+    format_pattern = fr"<reasoning>\s*.*?\s*</reasoning>\s*<answer1>\s*.*?\s*</answer1>\s*<answer2>\s*.*?\s*</answer2>$"
     if re.search(format_pattern, solution_str):
         reward += 0.2
 
@@ -107,7 +107,7 @@ def encoded_reward(solution_str, ground_truth):
 def length_penalty_reward(solution_str, ground_truth):
     reward = 0
 
-    format_pattern = fr"^\s*<reasoning>\s*.*?\s*</reasoning>\s*<answer1>\s*.*?\s*</answer1>\s*<answer2>\s*.*?\s*</answer2>$"
+    format_pattern = fr"<reasoning>\s*.*?\s*</reasoning>\s*<answer1>\s*.*?\s*</answer1>\s*<answer2>\s*.*?\s*</answer2>$"
     if re.search(format_pattern, solution_str):
         reward += 0.2
 
