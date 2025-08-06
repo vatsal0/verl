@@ -43,6 +43,6 @@ python3 -m verl.trainer.main_ppo \
     trainer.save_freq=50 \
     trainer.test_freq=5 \
     trainer.critic_warmup=0 \
-    trainer.default_local_dir=/home/user/checkpoints \
+    trainer.default_local_dir=/home/user/checkpoints/encoded \
     trainer.max_actor_ckpt_to_keep=2 \
     trainer.max_critic_ckpt_to_keep=2

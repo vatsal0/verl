@@ -36,6 +36,7 @@ Your response, containing ONLY the reasoning trace relating to the first questio
         ],
         "reasoning": {"max_tokens": 512},
     }))
+    if response.status_code != 200: return str()
     return json.loads(response.text)["choices"][0]["message"]["content"]
 
 def encoded_monitor(reasoning_trace):
@@ -62,6 +63,7 @@ Your response, consisting of a single integer score between 0 and 10:
         ],
         "reasoning": {"max_tokens": 512},
     }))
+    if response.status_code != 200: return str()
     return json.loads(response.text)["choices"][0]["message"]["content"]
 
 def model_call_with_logprobs(model, context):
