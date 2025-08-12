@@ -109,7 +109,7 @@ def encoded_reward(solution_str, ground_truth):
 def length_penalty_reward(solution_str, ground_truth):
     reward = 0
 
-    format_pattern = fr"<reasoning>\s*.*?\s*</reasoning>\s*<answer1>\s*.*?\s*</answer1>\s*<answer2>\s*.*?\s*</answer2>$"
+    format_pattern = fr"<reasoning1>\s*.*?\s*</reasoning1>\s*<answer1>\s*.*?\s*</answer1>\s*<reasoning2>\s*.*?\s*</reasoning2>\s*<answer2>\s*.*?\s*</answer2>$"
     if re.search(format_pattern, solution_str):
         reward += 0.2
 
@@ -118,8 +118,9 @@ def length_penalty_reward(solution_str, ground_truth):
         if parsed_answer == ground_truth.split('\n')[-1].strip():
             reward += 0.8
 
-            reasoning_trace = extract_xml(solution_str, '<reasoning>', '</reasoning>')
-            length_ratio = len(separate_first_reasoning_trace(reasoning_trace))/len(reasoning_trace)
+            reasoning_trace_1 = extract_xml(solution_str, '<reasoning1>', '</reasoning1>')
+            reasoning_trace_2 = extract_xml(solution_str, '<reasoning2>', '</reasoning2>')
+            length_ratio = len(reasoning_trace_1) / (len(reasoning_trace_1) + len(reasoning_trace_2))
 
             # length ratio is in [0, 1]
             reward += length_ratio * 0.5

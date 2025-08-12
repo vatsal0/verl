@@ -34,6 +34,8 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=$MICRO_BATCH_SIZE \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
     actor_rollout_ref.rollout.n=$NUM_GENERATIONS \
+    actor_rollout_ref.actor.loss_agg_mode=seq-mean-token-sum-norm \
+    algorithm.norm_adv_by_std_in_grpo=False \
     trainer.total_epochs=5 \
     trainer.project_name='encoded' \
     trainer.experiment_name='encoded qwen 3b' \

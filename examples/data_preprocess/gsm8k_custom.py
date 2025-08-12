@@ -19,13 +19,17 @@ Respond in the following format:
 DOUBLE_COT_SYSTEM_PROMPT = '''/no_think
 Answer the provided questions after providing a few sentences of reasoning for each question. Your answer must only contain a single integer with no additional symbols or phrases. Do not output anything other than a single integer between the <answer> and </answer> tags.
 Respond in the following format:
-<reasoning>
+<reasoning1>
 ...
-</reasoning>
+</reasoning1>
 
 <answer1>
 ...
 </answer1>
+
+<reasoning2>
+...
+</reasoning2>
 
 <answer2>
 ...
