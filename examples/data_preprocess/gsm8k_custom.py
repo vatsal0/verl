@@ -134,6 +134,7 @@ if __name__ == "__main__":
                         "index": i,
                         "answer": answer,
                         "question": question,
+                        "prompt": SINGLE_COT_SYSTEM_PROMPT,
                     })
                 else:
                     raise NotImplementedError
