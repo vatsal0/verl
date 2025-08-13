@@ -128,7 +128,7 @@ def length_penalty_reward(solution_str, ground_truth):
     
     return reward
  
-def weak_model_interp_reward(solution_str, ground_truth, prompt, question, model="Qwen/Qwen3-0.6B"):
+def weak_model_interp_reward(solution_str, ground_truth, prompt, question, model="Qwen/Qwen3-4B"):
     reward = 0
 
     format_pattern = fr"<reasoning>\s*.*?\s*</reasoning>\s*<answer>\s*.*?\s*</answer>$"
