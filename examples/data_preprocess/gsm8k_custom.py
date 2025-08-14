@@ -78,7 +78,15 @@ if __name__ == "__main__":
         for split in ["train", "test"]:
             data_split = dataset[split]
             N = len(data_split)
-            for i in range(N):
+
+            encoded_incorrect_ids = []
+            
+            for _i in range(len(encoded_incorrect_ids) if method == "encoded" and split == "train" else N):
+                if method == "encoded" and split == "train":
+                    i = (encoded_incorrect_ids[_i] - 1) * pow(2, -1, N) % N # want (i * 2 + 1) % N to equal ids[_i]
+                else:
+                    i = _i
+
                 data_dict[split]["data_source"].append(f"{data_source}/{method}")
                 data_dict[split]["ability"].append("math")
 
@@ -105,7 +113,7 @@ if __name__ == "__main__":
                     data_dict[split]["reward_model"].append({"style": "rule", "ground_truth": f"{solution_1}\n{solution_2}"})
                     data_dict[split]["extra_info"].append({
                         "split": split,
-                        "index": i,
+                        "index": _i,
                         "answer_1": answer_1,
                         "question_1": question_1,
                         "answer_2": answer_2,
