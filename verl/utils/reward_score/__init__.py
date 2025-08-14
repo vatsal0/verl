@@ -47,7 +47,7 @@ def default_compute_score(
     elif data_source == "openai/gsm8k/encoded":
         from .custom_rewards import encoded_reward
 
-        res = encoded_reward(solution_str, ground_truth)
+        res = encoded_reward(solution_str, ground_truth, extra_info["question_1"], extra_info["question_2"])
     elif data_source == "openai/gsm8k/length_penalty":
         from .custom_rewards import length_penalty_reward
 
