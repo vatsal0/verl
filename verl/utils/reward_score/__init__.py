@@ -56,6 +56,10 @@ def default_compute_score(
         from .custom_rewards import weak_model_interp_reward
 
         res = weak_model_interp_reward(solution_str, ground_truth, extra_info["prompt"], extra_info["question"])
+    elif data_source == "openai/gsm8k/encoded_format":
+        from .custom_rewards import encoded_format_reward
+
+        res = encoded_format_reward(solution_str, ground_truth)
     elif data_source in ["lighteval/MATH", "DigitalLearningGmbH/MATH-lighteval", "HuggingFaceH4/MATH-500"]:
         from . import math
 

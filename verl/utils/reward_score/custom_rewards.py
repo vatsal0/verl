@@ -187,3 +187,17 @@ def weak_model_interp_reward(solution_str, ground_truth, prompt, question, model
 
     return reward
 
+# 0.2 for format, extra +0.8 if answer is only an integer
+def encoded_format_reward(solution_str, ground_truth):
+    reward = 0
+
+    format_pattern = fr"<reasoning>\s*.*?\s*</reasoning>\s*<answer1>\s*.*?\s*</answer1>\s*<answer2>\s*.*?\s*</answer2>$"
+    if re.search(format_pattern, solution_str):
+        reward += 0.2
+
+        parsed_answer = extract_xml(solution_str, '<answer2>', '</answer2>')
+        # HACK the dataset's answer field has both answers so split to get the second one
+        if parsed_answer.isdigit():
+            reward += 0.8
+
+    return reward
