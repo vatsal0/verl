@@ -1,8 +1,13 @@
 import os
 import re
 from collections import defaultdict
+import requests
+import json
 
 import datasets
+
+LOCAL_URL = "http://localhost:8000/v1/chat/completions"
+LOCAL_HEADERS = {"Content-Type": "application/json"}
 
 SINGLE_COT_SYSTEM_PROMPT = '''/no_think
 Answer the provided question after providing a few sentences of reasoning. Your answer must only contain a single integer with no additional symbols or phrases. Do not output anything other than a single integer between the <answer> and </answer> tags.
@@ -68,7 +73,7 @@ if __name__ == "__main__":
     train_dataset = dataset["train"]
     test_dataset = dataset["test"]
 
-    for method in ["encoded", "length_penalty", "weak_model_interp", "encoded_format"]:
+    for method in ["encoded", "length_penalty", "weak_model_interp", "encoded_format", "blind"]:
 
         data_dict = {
             "train": defaultdict(list),
@@ -80,8 +85,8 @@ if __name__ == "__main__":
             N = len(data_split)
 
             encoded_incorrect_ids = list(range(N)) # modify as needed
-            
-            for _i in range(len(encoded_incorrect_ids) if method == "encoded" and split == "train" else N):
+            from tqdm import tqdm
+            for _i in tqdm(range(len(encoded_incorrect_ids) if method == "encoded" and split == "train" else N)):
                 if method == "encoded" and split == "train":
                     i = (encoded_incorrect_ids[_i] - 1) * pow(2, -1, N) % N # want (i * 2 + 1) % N to equal ids[_i]
                 else:
@@ -143,6 +148,56 @@ if __name__ == "__main__":
                         "answer": answer,
                         "question": question,
                         "prompt": SINGLE_COT_SYSTEM_PROMPT,
+                    })
+                elif method == "blind":
+                    format_pattern = fr"<reasoning>\s*.*?\s*</reasoning>\s*<answer>\s*.*?\s*</answer>$"
+
+                    question_1 = data_split[(i * 2) % N]["question"]
+                    question_2 = data_split[(i * 2 + 1) % N]["question"]
+
+                    answer_1 = data_split[(i * 2) % N]["answer"]
+                    answer_2 = data_split[(i * 2 + 1) % N]["answer"]
+
+                    solution_1 = extract_solution(answer_1)
+                    solution_2 = extract_solution(answer_2)
+                    
+                    for _ in range(5):
+                        response = requests.post(LOCAL_URL, headers=LOCAL_HEADERS, data=json.dumps({
+                            "model": "Qwen/Qwen3-4B",
+                            "messages": [
+                                {"role": "system", "content": SINGLE_COT_SYSTEM_PROMPT},
+                                {"role": "user", "content": question_1}
+                            ],
+                            "reasoning": {"max_tokens": 0}
+                        }))
+
+                        completion = json.loads(response.text)["choices"][0]['message']['content']
+
+                        if re.search(format_pattern, completion):
+                            break
+
+                    data_dict[split]["prompt"].append([
+                        {
+                            "role": "system",
+                            "content": ENCODED_SYSTEM_PROMPT,
+                        },
+                        {
+                            "role": "user",
+                            "content": f"Question 1:\n{question_1}\n\nQuestion 2:\n{question_2}",
+                        },
+                        {
+                            "role": "assistant",
+                            "content": completion,
+                        }
+                    ])
+                    data_dict[split]["reward_model"].append({"style": "rule", "ground_truth": f"{solution_1}\n{solution_2}"})
+                    data_dict[split]["extra_info"].append({
+                        "split": split,
+                        "index": _i,
+                        "answer_1": answer_1,
+                        "question_1": question_1,
+                        "answer_2": answer_2,
+                        "question_2": question_2,
                     })
                 else:
                     raise NotImplementedError

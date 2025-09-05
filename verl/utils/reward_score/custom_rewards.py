@@ -201,3 +201,19 @@ def encoded_format_reward(solution_str, ground_truth):
             reward += 0.8
 
     return reward
+
+# 0.2 for format, extra +0.8 for correctness
+def blind_reward(solution_str, ground_truth):
+    reward = 0
+
+    format_pattern = fr"<answer2>\s*.*?\s*</answer2>$"
+    anti_pattern = fr"<reasoning>\s*.*?\s*</reasoning>\s*<answer2>\s*.*?\s*</answer2>$"
+    if re.search(format_pattern, solution_str) and not re.search(anti_pattern, solution_str):
+        reward += 0.2
+
+        parsed_answer = extract_xml(solution_str, '<answer2>', '</answer2>')
+        # HACK the dataset's answer field has both answers so split to get the second one
+        if parsed_answer == ground_truth.split('\n')[-1].strip():
+            reward += 0.8
+
+    return reward
