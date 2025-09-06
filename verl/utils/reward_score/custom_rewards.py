@@ -4,7 +4,7 @@ import re
 import requests
 import numpy as np
 
-# vllm serve Qwen/Qwen3-0.6B --gpu-memory-utilization 0.1 --max-model-len 768
+# vllm serve Qwen/Qwen3-4B --gpu-memory-utilization 0.25 --tensor-parallel-size 2 --max-model-len 768
 LOCAL_URL = "http://localhost:8000/v1/chat/completions"
 LOCAL_HEADERS = {"Content-Type": "application/json"}
 

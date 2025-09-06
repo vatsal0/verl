@@ -1,8 +1,7 @@
-export NUM_GPUS=1
-export CUDA_VISIBLE_DEVICES=0
-export NUM_GENERATIONS=8
-export BATCH_SIZE=32
-export MICRO_BATCH_SIZE=2
+export NUM_GPUS=$(nvidia-smi --query-gpu=name --format=csv,noheader | wc -l)
+export NUM_GENERATIONS=16
+export BATCH_SIZE=64
+export MICRO_BATCH_SIZE=8
 
 # CUDA_VISIBLE_DEVICES=0 vllm serve Qwen/Qwen3-4B --gpu-memory-utilization 0.2 --max-model-len 768 --dtype bfloat16
 # CUDA_VISIBLE_DEVICES=0 vllm serve Qwen/Qwen3-0.6B --gpu-memory-utilization 0.1 --max-model-len 768 --dtype bfloat16
@@ -34,7 +33,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.temperature=1.0 \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.4 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.5 \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=$MICRO_BATCH_SIZE \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
     actor_rollout_ref.rollout.n=$NUM_GENERATIONS \
