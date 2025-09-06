@@ -60,6 +60,10 @@ def default_compute_score(
         from .custom_rewards import encoded_format_reward
 
         res = encoded_format_reward(solution_str, ground_truth)
+    elif data_source == "openai/gsm8k/blind":
+        from .custom_rewards import blind_reward
+
+        res = blind_reward(solution_str, ground_truth)
     elif data_source in ["lighteval/MATH", "DigitalLearningGmbH/MATH-lighteval", "HuggingFaceH4/MATH-500"]:
         from . import math
 
