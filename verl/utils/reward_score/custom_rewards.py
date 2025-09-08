@@ -48,6 +48,8 @@ def model_call_logprobs(model, prompt, question, reasoning_trace):
         "continue_final_message": True
     }))
 
+    if "choices" not in json.loads(response.text):
+        return None, []
     completion = json.loads(response.text)["choices"][0]
     return completion["message"]["content"], completion["logprobs"]["content"]
 
@@ -175,7 +177,7 @@ def weak_model_interp_reward(solution_str, ground_truth, prompt, question, model
             
             # model was not going to generate this answer
             if len(answer_to_complete) > 0:
-                answer_prob = 0
+                answer_prob = 0 if answer is not None else 1 # edge case: if logprob errored just penalize
             # total prob of generating each sequence: product of individual probs
             # = exponent of sum of logprobs
             else:
@@ -206,12 +208,15 @@ def encoded_format_reward(solution_str, ground_truth):
 def blind_reward(solution_str, ground_truth):
     reward = 0
 
-    format_pattern = fr"<answer2>\s*.*?\s*</answer2>$"
-    anti_pattern = fr"<reasoning>\s*.*?\s*</reasoning>\s*<answer2>\s*.*?\s*</answer2>$"
-    if re.search(format_pattern, solution_str) and not re.search(anti_pattern, solution_str):
-        reward += 0.2
+    format_pattern = fr"\s*<answer2>\s*.*?\s*</answer2>\s*$"
+    if re.match(format_pattern, solution_str):
+        reward += 0.1
 
         parsed_answer = extract_xml(solution_str, '<answer2>', '</answer2>')
+
+        if parsed_answer.isdigit():
+            reward += 0.1
+
         # HACK the dataset's answer field has both answers so split to get the second one
         if parsed_answer == ground_truth.split('\n')[-1].strip():
             reward += 0.8
