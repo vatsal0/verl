@@ -9,7 +9,7 @@ python3 -m verl.trainer.main_ppo \
     data.train_files=$HOME/data/encoded/train.parquet \
     data.val_files=$HOME/data/encoded/test.parquet \
     data.max_prompt_length=2048 \
-    data.max_response_length=512 \
+    data.max_response_length=768 \
     data.train_batch_size=$BATCH_SIZE \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
@@ -26,7 +26,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.optim.lr_warmup_steps=20 \
     actor_rollout_ref.actor.optim.min_lr_ratio=0.1 \
     actor_rollout_ref.actor.optim.warmup_style=cosine \
-    actor_rollout_ref.actor.optim.total_training_steps=2000 \
+    actor_rollout_ref.actor.optim.total_training_steps=10000 \
     actor_rollout_ref.actor.entropy_coeff=0 \
     actor_rollout_ref.actor.fsdp_config.param_offload=False \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
@@ -40,7 +40,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.n=$NUM_GENERATIONS \
     actor_rollout_ref.actor.loss_agg_mode=seq-mean-token-sum-norm \
     algorithm.norm_adv_by_std_in_grpo=False \
-    trainer.total_epochs=5 \
+    trainer.total_epochs=10 \
     trainer.project_name='encoded' \
     trainer.experiment_name='encoded qwen 3b' \
     trainer.logger=['console','wandb'] \

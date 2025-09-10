@@ -9,7 +9,7 @@ python3 -m verl.trainer.main_ppo \
     data.train_files=$HOME/data/length_penalty/train.parquet \
     data.val_files=$HOME/data/length_penalty/test.parquet \
     data.max_prompt_length=2048 \
-    data.max_response_length=512 \
+    data.max_response_length=768 \
     data.train_batch_size=$BATCH_SIZE \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
@@ -36,7 +36,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.n=$NUM_GENERATIONS \
     actor_rollout_ref.actor.loss_agg_mode=seq-mean-token-sum-norm \
     algorithm.norm_adv_by_std_in_grpo=False \
-    trainer.total_epochs=5 \
+    trainer.total_epochs=10 \
     trainer.project_name='encoded' \
     trainer.experiment_name='length penalty qwen 3b' \
     trainer.logger=['console','wandb'] \

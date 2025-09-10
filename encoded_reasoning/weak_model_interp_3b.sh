@@ -12,7 +12,7 @@ python3 -m verl.trainer.main_ppo \
     data.train_files=$HOME/data/weak_model_interp/train.parquet \
     data.val_files=$HOME/data/weak_model_interp/test.parquet \
     data.max_prompt_length=2048 \
-    data.max_response_length=512 \
+    data.max_response_length=768 \
     data.train_batch_size=$BATCH_SIZE \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
@@ -29,7 +29,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.optim.lr_warmup_steps=20 \
     actor_rollout_ref.actor.optim.min_lr_ratio=0.1 \
     actor_rollout_ref.actor.optim.warmup_style=cosine \
-    actor_rollout_ref.actor.optim.total_training_steps=2000 \
+    actor_rollout_ref.actor.optim.total_training_steps=10000 \
     actor_rollout_ref.actor.entropy_coeff=0 \
     actor_rollout_ref.actor.fsdp_config.param_offload=False \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
@@ -37,13 +37,13 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.temperature=1.0 \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.5 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.55 \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=$MICRO_BATCH_SIZE \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
     actor_rollout_ref.rollout.n=$NUM_GENERATIONS \
     actor_rollout_ref.actor.loss_agg_mode=seq-mean-token-sum-norm \
     algorithm.norm_adv_by_std_in_grpo=False \
-    trainer.total_epochs=5 \
+    trainer.total_epochs=10 \
     trainer.project_name='encoded' \
     trainer.experiment_name='weak model interp qwen 3b' \
     trainer.logger=['console','wandb'] \
