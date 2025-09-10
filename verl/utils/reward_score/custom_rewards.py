@@ -143,10 +143,6 @@ def length_penalty_reward(solution_str, ground_truth):
             # length ratio is in [0, 1]
             length_reward += length_ratio * 0.5
         
-        if len(reasoning_trace_1) > 512:
-            print(reasoning_trace_1)
-            from pdb import set_trace
-            set_trace()
     return {
         "score": format_reward + correctness_reward + length_reward,
         "format_reward": format_reward,
