@@ -290,6 +290,66 @@ def compute_advantage(
         data.batch["returns"] = returns
     return data
 
+def find_last_subseq(sequences, pattern):
+    """
+    sequences: (B, L) LongTensor
+    pattern: (P,) LongTensor
+    Returns: (B,) LongTensor of last end index, -1 if not found
+    """
+    B, L = sequences.shape
+    P = pattern.size(0)
+
+    # (B, L-P+1, P)
+    windows = sequences.unfold(1, P, 1)
+    matches = (windows == pattern).all(-1)  # (B, L-P+1)
+
+    # Convert boolean -> last index, else -1
+    idxs = torch.arange(P-1, L, device=sequences.device)  # positions of pattern end
+    masked_idxs = matches * idxs.unsqueeze(0)             # zero if no match
+    last = masked_idxs.max(dim=1).values                  # max end index
+    last[last == 0] = -1  # fix batches with no match
+    return last
+
+def prefill_answers(sequences, end_positions, answers_padded, answers_mask):
+    """
+    sequences: (B, L)
+    end_positions: (B,)
+    answers_padded: (B, A_max)
+    answers_mask: (B, A_max) with 1=valid token, 0=padding
+    """
+    B, L = sequences.shape
+    _, A_max = answers_padded.shape
+
+    # Compute target write indices for each answer token
+    base = end_positions.unsqueeze(1) + 1  # (B,1)
+    arange = torch.arange(A_max, device=sequences.device).unsqueeze(0)  # (1, A_max)
+    target_idx = base + arange  # (B, A_max)
+
+    # Mask out overflow and -1 cases
+    valid = (answers_mask == 1) & (end_positions.unsqueeze(1) != -1) & (target_idx < L)
+
+    # Flatten for scatter
+    flat_seq = sequences.clone().reshape(-1)
+    flat_offsets = torch.arange(B, device=sequences.device)[:, None] * L  # (B,1)
+    flat_indices = (flat_offsets + target_idx).reshape(-1)  # (B*A_max,)
+    flat_values  = answers_padded.reshape(-1)
+    flat_valid   = valid.reshape(-1)
+
+    flat_seq[flat_indices[flat_valid]] = flat_values[flat_valid]
+    return flat_seq.view(B, L)
+
+def mask_reasoning(mask, start_positions, end_positions):
+    """
+    mask: (B, L), 1=keep, 0=mask
+    """
+    B, L = mask.shape
+    arange = torch.arange(L, device=mask.device).unsqueeze(0)  # (1,L)
+
+    in_span = (arange >= start_positions.unsqueeze(1)) & (arange <= end_positions.unsqueeze(1))
+    valid = (start_positions != -1) & (end_positions != -1) & (end_positions > start_positions)
+    in_span = in_span & valid.unsqueeze(1)
+
+    return mask * (~in_span)
 
 class RayPPOTrainer:
     """Distributed PPO trainer using Ray for scalable reinforcement learning.
@@ -1036,6 +1096,78 @@ class RayPPOTrainer:
         )
         metrics.update(global_balance_stats)
 
+    def add_attn_reward(self, batch, reward_extra_infos_dict):
+        if 'target_answer' not in reward_extra_infos_dict.keys():
+            return
+        
+        tokenizer = self.tokenizer
+
+        answer2_pos = torch.max(
+            find_last_subseq(
+                batch.batch['input_ids'], torch.LongTensor(tokenizer.encode('<answer2>\n'))
+            ),
+            find_last_subseq(
+                batch.batch['input_ids'], torch.LongTensor(tokenizer.encode('<answer2>'))
+            )
+        )
+
+        answers = tokenizer(
+            reward_extra_infos_dict['target_answer'], 
+            padding=True, 
+            return_tensors='pt'
+        )
+        prefilled_sequences = prefill_answers(
+            batch.batch['input_ids'],
+            answer2_pos,
+            answers['input_ids'],
+            answers['attention_mask']
+        )
+
+        reasoning1_start_pos = torch.max(
+            find_last_subseq(
+                batch.batch['input_ids'], torch.LongTensor(tokenizer.encode('<reasoning1>\n'))
+            ),
+            find_last_subseq(
+                batch.batch['input_ids'], torch.LongTensor(tokenizer.encode('<reasoning1>'))
+            )
+        )
+
+        reasoning1_end_pos = torch.max(
+            find_last_subseq(
+                batch.batch['input_ids'], torch.LongTensor(tokenizer.encode('</reasoning1>\n'))
+            ),
+            find_last_subseq(
+                batch.batch['input_ids'], torch.LongTensor(tokenizer.encode('</reasoning1>'))
+            )
+        )
+
+        attention_mask = mask_reasoning(
+            batch.batch['attention_mask'], 
+            reasoning1_start_pos,
+            reasoning1_end_pos
+        )
+
+        new_batch = batch.select(deepcopy=True)
+        new_batch.batch['input_ids'] = prefilled_sequences
+
+        base_log_prob = self.actor_rollout_wg.compute_log_prob(new_batch)
+        new_batch.batch['attention_mask'] = attention_mask
+        mask_log_prob = self.actor_rollout_wg.compute_log_prob(new_batch)
+
+        batch_idx = torch.arange(base_log_prob.batch['old_log_probs'].shape[0])
+        seq_idx = answer2_pos - self.config.data.max_prompt_length
+        prob_diff = (mask_log_prob.batch['old_log_probs'].exp() - base_log_prob.batch['old_log_probs'].exp())[batch_idx, seq_idx + 1]
+
+        # ignore seqs where we didn't find answer2
+        prob_diff *= (answer2_pos != -1)
+
+        reward_extra_infos_dict['attn_reward'] = prob_diff.tolist()
+        reward_extra_infos_dict['score'] = [
+            score + attn for score, attn in 
+            zip(reward_extra_infos_dict['score'], reward_extra_infos_dict['attn_reward'])
+        ]
+        pprint(f"Attention reward: {prob_diff.mean().item()}")
+
     def fit(self):
         """
         The training loop of PPO.
@@ -1193,6 +1325,8 @@ class RayPPOTrainer:
                             future_reward = compute_reward_async.remote(data=batch, reward_fn=self.reward_fn)
                         else:
                             reward_tensor, reward_extra_infos_dict = compute_reward(batch, self.reward_fn)
+
+                    self.add_attn_reward(batch, reward_extra_infos_dict)
 
                     # recompute old_log_probs
                     with marked_timer("old_log_prob", timing_raw, color="blue"):

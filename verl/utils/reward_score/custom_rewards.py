@@ -150,6 +150,7 @@ def length_penalty_reward(solution_str, ground_truth):
         "length_reward": length_reward,
         "trace1_length": len(reasoning_trace_1) if format_reward > 0 else 0,
         "trace2_length": len(reasoning_trace_2) if format_reward > 0 else 0,
+        "target_answer": ground_truth.split('\n')[-1].strip(),
     }
  
 def weak_model_interp_reward(solution_str, ground_truth, prompt, question, model="Qwen/Qwen3-4B"):
