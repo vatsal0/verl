@@ -1162,8 +1162,8 @@ class RayPPOTrainer:
         reward = torch.clamp(reward, min=0)
 
         reward_extra_infos_dict['attn_reward'] = [
-            attn if correctness > 0 else 0 for attn, correctness in 
-            zip(reward.tolist(), reward_extra_infos_dict['correctness_reward'])
+            attn if fmt > 0 else 0 for attn, fmt in 
+            zip(reward.tolist(), reward_extra_infos_dict['format_reward'])
         ]
         reward_extra_infos_dict['score'] = [
             score + attn for score, attn in 
