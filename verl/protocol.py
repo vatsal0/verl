@@ -501,6 +501,8 @@ class DataProto:
             sub_batch = self.batch.select(*batch_keys)
         else:
             sub_batch = self.batch
+            if deepcopy:
+                sub_batch = copy.deepcopy(self.batch)
 
         if non_tensor_batch_keys is not None:
             non_tensor_batch = {key: val for key, val in self.non_tensor_batch.items() if key in non_tensor_batch_keys}

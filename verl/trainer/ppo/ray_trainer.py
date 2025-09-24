@@ -1102,20 +1102,17 @@ class RayPPOTrainer:
         
         tokenizer = self.tokenizer
 
-        answer2_pos = torch.max(
-            find_last_subseq(
-                batch.batch['input_ids'], torch.LongTensor(tokenizer.encode('<answer2>\n'))
-            ),
-            find_last_subseq(
-                batch.batch['input_ids'], torch.LongTensor(tokenizer.encode('<answer2>'))
-            )
-        )
+        answer2_pos = torch.stack([
+            find_last_subseq(batch.batch['input_ids'], torch.LongTensor(tokenizer.encode(pattern)))
+            for pattern in ['<answer2>\n', '\n<answer2>\n', '.<answer2>\n']
+        ]).max(dim=0).values
 
         answers = tokenizer(
             reward_extra_infos_dict['target_answer'], 
             padding=True, 
             return_tensors='pt'
         )
+        answer_window = answers['input_ids'].shape[1]
         prefilled_sequences = prefill_answers(
             batch.batch['input_ids'],
             answer2_pos,
@@ -1123,23 +1120,15 @@ class RayPPOTrainer:
             answers['attention_mask']
         )
 
-        reasoning1_start_pos = torch.max(
-            find_last_subseq(
-                batch.batch['input_ids'], torch.LongTensor(tokenizer.encode('<reasoning1>\n'))
-            ),
-            find_last_subseq(
-                batch.batch['input_ids'], torch.LongTensor(tokenizer.encode('<reasoning1>'))
-            )
-        )
+        reasoning1_start_pos = torch.stack([
+            find_last_subseq(batch.batch['input_ids'], torch.LongTensor(tokenizer.encode(pattern)))
+            for pattern in ['<reasoning1', '\n<reasoning1', '.<reasoning1']
+        ]).max(dim=0).values
 
-        reasoning1_end_pos = torch.max(
-            find_last_subseq(
-                batch.batch['input_ids'], torch.LongTensor(tokenizer.encode('</reasoning1>\n'))
-            ),
-            find_last_subseq(
-                batch.batch['input_ids'], torch.LongTensor(tokenizer.encode('</reasoning1>'))
-            )
-        )
+        reasoning1_end_pos = torch.stack([
+            find_last_subseq(batch.batch['input_ids'], torch.LongTensor(tokenizer.encode(pattern)))
+            for pattern in ['</reasoning1', '\n</reasoning1', '.</reasoning1']
+        ]).max(dim=0).values
 
         attention_mask = mask_reasoning(
             batch.batch['attention_mask'], 
@@ -1155,18 +1144,29 @@ class RayPPOTrainer:
         mask_log_prob = self.actor_rollout_wg.compute_log_prob(new_batch)
 
         batch_idx = torch.arange(base_log_prob.batch['old_log_probs'].shape[0])
-        seq_idx = answer2_pos - self.config.data.max_prompt_length
-        prob_diff = (mask_log_prob.batch['old_log_probs'].exp() - base_log_prob.batch['old_log_probs'].exp())[batch_idx, seq_idx + 1]
+        seq_idx = torch.clamp(answer2_pos - self.config.data.max_prompt_length + 1, min=0)
 
-        # ignore seqs where we didn't find answer2
-        prob_diff *= (answer2_pos != -1)
+        logprob_diff = (base_log_prob.batch['old_log_probs'] - mask_log_prob.batch['old_log_probs'])
 
-        reward_extra_infos_dict['attn_reward'] = prob_diff.tolist()
+        offsets = torch.arange(answer_window, device=logprob_diff.device)
+        answer_indices = seq_idx[:, None] + offsets[None, :]
+        valid_index = answer_indices < logprob_diff.shape[1]
+        safe_indices = torch.where(valid_index, answer_indices, torch.zeros_like(answer_indices))
+
+        answer_diff = torch.gather(logprob_diff, 1, safe_indices)
+        answer_diff = answer_diff * valid_index * answers['attention_mask']
+        answer_diff = answer_diff.sum(dim=1) # / (valid_index * answers['attention_mask']).sum(dim=1)
+
+        # ignore seqs where we didn't find answer2 in the response
+        reward = answer_diff * (answer2_pos > self.config.data.max_prompt_length)
+        reward = torch.clamp(reward, min=0)
+
+        reward_extra_infos_dict['attn_reward'] = reward.tolist()
         reward_extra_infos_dict['score'] = [
             score + attn for score, attn in 
             zip(reward_extra_infos_dict['score'], reward_extra_infos_dict['attn_reward'])
         ]
-        pprint(f"Attention reward: {prob_diff.mean().item()}")
+        pprint(f"Attention reward: avg {reward.mean().item()} min {reward.min().item()} max {reward.max().item()}")
 
     def fit(self):
         """
