@@ -1103,8 +1103,8 @@ class RayPPOTrainer:
         tokenizer = self.tokenizer
 
         answer2_pos = torch.stack([
-            find_last_subseq(batch.batch['input_ids'], torch.LongTensor(tokenizer.encode(pattern)))
-            for pattern in ['<answer2>\n', '\n<answer2>\n', '.<answer2>\n']
+            find_last_subseq(batch.batch['input_ids'], torch.LongTensor(tokenizer.encode(pattern, add_special_tokens=False)))
+            for pattern in ['<answer2>\n', '\n<answer2>\n', '.<answer2>\n', '<answer2>', '\n<answer2>', '.<answer2>', ]
         ]).max(dim=0).values
 
         answers = tokenizer(
@@ -1121,12 +1121,12 @@ class RayPPOTrainer:
         )
 
         reasoning1_start_pos = torch.stack([
-            find_last_subseq(batch.batch['input_ids'], torch.LongTensor(tokenizer.encode(pattern)))
+            find_last_subseq(batch.batch['input_ids'], torch.LongTensor(tokenizer.encode(pattern, add_special_tokens=False)))
             for pattern in ['<reasoning1', '\n<reasoning1', '.<reasoning1']
         ]).max(dim=0).values
 
         reasoning1_end_pos = torch.stack([
-            find_last_subseq(batch.batch['input_ids'], torch.LongTensor(tokenizer.encode(pattern)))
+            find_last_subseq(batch.batch['input_ids'], torch.LongTensor(tokenizer.encode(pattern, add_special_tokens=False)))
             for pattern in ['</reasoning1', '\n</reasoning1', '.</reasoning1']
         ]).max(dim=0).values
 
@@ -1155,17 +1155,21 @@ class RayPPOTrainer:
 
         answer_diff = torch.gather(logprob_diff, 1, safe_indices)
         answer_diff = answer_diff * valid_index * answers['attention_mask']
-        answer_diff = answer_diff.sum(dim=1) # / (valid_index * answers['attention_mask']).sum(dim=1)
+        answer_diff = answer_diff.sum(dim=1) / (valid_index * answers['attention_mask']).sum(dim=1).clamp(min=1)
 
         # ignore seqs where we didn't find answer2 in the response
         reward = answer_diff * (answer2_pos > self.config.data.max_prompt_length)
         reward = torch.clamp(reward, min=0)
 
-        reward_extra_infos_dict['attn_reward'] = reward.tolist()
+        reward_extra_infos_dict['attn_reward'] = [
+            attn if correctness > 0 else 0 for attn, correctness in 
+            zip(reward.tolist(), reward_extra_infos_dict['correctness_reward'])
+        ]
         reward_extra_infos_dict['score'] = [
             score + attn for score, attn in 
             zip(reward_extra_infos_dict['score'], reward_extra_infos_dict['attn_reward'])
         ]
+        reward = torch.Tensor(reward_extra_infos_dict['attn_reward'])
         pprint(f"Attention reward: avg {reward.mean().item()} min {reward.min().item()} max {reward.max().item()}")
 
     def fit(self):
@@ -1327,6 +1331,9 @@ class RayPPOTrainer:
                             reward_tensor, reward_extra_infos_dict = compute_reward(batch, self.reward_fn)
 
                     self.add_attn_reward(batch, reward_extra_infos_dict)
+                    B, L = batch.batch['response_mask'].shape
+                    reward_indices = (batch.batch['response_mask'] * torch.arange(L)).argmax(dim=1)
+                    reward_tensor[torch.arange(B), reward_indices] = torch.Tensor(reward_extra_infos_dict['score'])
 
                     # recompute old_log_probs
                     with marked_timer("old_log_prob", timing_raw, color="blue"):
