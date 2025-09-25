@@ -3,6 +3,8 @@ export NUM_GENERATIONS=16
 export BATCH_SIZE=64
 export MICRO_BATCH_SIZE=16
 
+export VERL_AUTO_PADDING=1
+
 python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     algorithm.use_kl_in_reward=False \
@@ -13,7 +15,7 @@ python3 -m verl.trainer.main_ppo \
     data.train_batch_size=$BATCH_SIZE \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
-    actor_rollout_ref.model.path=Qwen/Qwen3-4B \
+    actor_rollout_ref.model.path=Qwen/Qwen3-4B-Instruct-2507 \
     actor_rollout_ref.model.use_remove_padding=True \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
     actor_rollout_ref.actor.ppo_mini_batch_size=$NUM_GENERATIONS \
@@ -46,5 +48,5 @@ python3 -m verl.trainer.main_ppo \
     trainer.test_freq=5 \
     trainer.critic_warmup=0 \
     trainer.default_local_dir=/home/user/checkpoints/length_penalty \
-    trainer.max_actor_ckpt_to_keep=2 \
-    trainer.max_critic_ckpt_to_keep=2
+    trainer.max_actor_ckpt_to_keep=200 \
+    trainer.max_critic_ckpt_to_keep=200
