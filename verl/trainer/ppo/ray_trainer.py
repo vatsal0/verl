@@ -1159,15 +1159,17 @@ class RayPPOTrainer:
 
         # ignore seqs where we didn't find answer2 in the response
         reward = answer_diff * (answer2_pos > self.config.data.max_prompt_length)
-        reward = torch.clamp(reward, min=0)
+        alpha = 2
+        reward = torch.clamp(reward, min=0, max=np.log(alpha))
+        reward = (torch.exp(reward) - 1) / (alpha - 1)
 
         reward_extra_infos_dict['attn_reward'] = [
-            attn if fmt > 0 else 0 for attn, fmt in 
+            attn if cond > 0 else 0 for attn, cond in 
             zip(reward.tolist(), reward_extra_infos_dict['format_reward'])
         ]
         reward_extra_infos_dict['score'] = [
-            score + attn for score, attn in 
-            zip(reward_extra_infos_dict['score'], reward_extra_infos_dict['attn_reward'])
+            score + attn * mult for score, attn, mult in 
+            zip(reward_extra_infos_dict['score'], reward_extra_infos_dict['attn_reward'], reward_extra_infos_dict['correctness_reward'])
         ]
         reward = torch.Tensor(reward_extra_infos_dict['attn_reward'])
         pprint(f"Attention reward: avg {reward.mean().item()} min {reward.min().item()} max {reward.max().item()}")
